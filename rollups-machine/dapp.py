@@ -71,30 +71,43 @@ def handle_advance(data):
     logger.info(f"Received advance request data {data}")
     try:
         log = bytearray.fromhex(data["payload"][2:])
-        res = verify_log("/cartridges/freedoom.sqfs", log)
+        res = verify_log("/cartridges/freedoom.sqfs", log, get_screenshot = True)
         outcard = res["outcard"]
         print("== Outcard ==")
         print(outcard.decode('ascii'))
-        logger.info("Adding notice")
-        notice = {"payload": "0x"+outcard.hex()}
-        response = requests.post(rollup_server + "/notice", json=notice)
+        print("State opened successfully.")
         try: 
             response = requests.get(lambada_server + "/open_state")
             response.raise_for_status() 
         except requests.exceptions.HTTPError as errh: 
-            return "Failed to open state: {errh}"
+            return "reject"
 
-        print("State opened successfully.")
+        try: 
+            response = requests.post(lambada_server + "/set_state/outcard", data = outcard, headers={'Content-Type': 'application/octet-stream'})
+            response.raise_for_status() 
+        except requests.exceptions.HTTPError as errh: 
+            return "reject"
+
+        try: 
+            response = requests.post(lambada_server + "/set_state/screenshot.png", data = res["screenshot"], headers={'Content-Type': 'application/octet-stream'})
+            response.raise_for_status() 
+        except requests.exceptions.HTTPError as errh: 
+            return "reject"
+
+        print("State set successfully.")
+
         try: 
             response = requests.get(lambada_server + "/commit_state")
             response.raise_for_status() 
         except requests.exceptions.HTTPError as errh: 
-            return "Failed to commit state: {errh}"
+            return "reject"
 
         print("State committed successfully.")
                 
         return "accept"
-    except:
+    except Exception as e:
+        print(f"something went wrong {e}")
+        # something is happening weirdly in lambada here
         return "reject"
 
 def handle_inspect(data):
