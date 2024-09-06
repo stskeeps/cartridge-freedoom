@@ -2,20 +2,11 @@
 
 # this custom kernel is only necessary in rollups v1.x
 ARG CARTESI_SDK_VERSION=0.9.0
-FROM cartesi/sdk:${CARTESI_SDK_VERSION} AS cartesi-riv-sdk
-ARG KERNEL_VERSION=0.19.1-riv1
-RUN curl -s -L https://github.com/rives-io/kernel/releases/download/v${KERNEL_VERSION}/linux-6.5.9-ctsi-1-v${KERNEL_VERSION}.bin \
-    -o /usr/share/cartesi-machine/images/linux.bin
-
 FROM --platform=linux/riscv64 cartesi/python:3.10-slim-jammy
 
-ARG MACHINE_EMULATOR_TOOLS_VERSION=0.14.1
-ADD https://github.com/cartesi/machine-emulator-tools/releases/download/v${MACHINE_EMULATOR_TOOLS_VERSION}/machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb /
-RUN dpkg -i /machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb \
-  && rm /machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb
 
-LABEL io.cartesi.rollups.sdk_version=0.9.0
-LABEL io.cartesi.rollups.sdk_name=riv/cartesi-sdk
+LABEL io.cartesi.rollups.sdk_version=devel
+LABEL io.cartesi.rollups.sdk_name=zippiehq/cartesi-lambada-sdk
 LABEL io.cartesi.rollups.ram_size=128Mi
 
 ARG DEBIAN_FRONTEND=noninteractive
@@ -27,8 +18,14 @@ apt-get install -y --no-install-recommends \
 rm -rf /var/lib/apt/lists/* /var/log/* /var/cache/*
 EOF
 
+ARG MACHINE_EMULATOR_TOOLS_VERSION=0.15.7
+ADD https://github.com/zippiehq/cartesi-lambada-guest-tools/releases/download/v${MACHINE_EMULATOR_TOOLS_VERSION}/machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb /
+RUN dpkg -i /machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb \
+  && rm /machine-emulator-tools-v${MACHINE_EMULATOR_TOOLS_VERSION}.deb
+
 # this creates dapp user actually with root privilege (need to call riv-run)
-RUN useradd --create-home --non-unique --uid 0 --gid 0 dapp
+RUN mkdir -p /etc/cartesi-init.d/
+RUN echo USER=root > /etc/cartesi-init.d/run-as-root
 
 ENV PATH="/opt/cartesi/bin:${PATH}"
 
@@ -62,6 +59,7 @@ EOF
 COPY ./dapp.py .
 
 ENV ROLLUP_HTTP_SERVER_URL="http://127.0.0.1:5004"
+ENV LAMBADA_HTTP_SERVER_URL="http://127.0.0.1:5005"
 
 ENTRYPOINT ["rollup-init"]
-CMD ["python3", "dapp.py"]
+CMD ["lambada-http-server", "lambada-init", "python3", "dapp.py"]

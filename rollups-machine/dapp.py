@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 rollup_server = environ["ROLLUP_HTTP_SERVER_URL"]
 logger.info(f"HTTP rollup_server url is {rollup_server}")
+lambada_server = environ["LAMBADA_HTTP_SERVER_URL"]
+
+logger.info(f"Lambada server is {lambada_server}")
 
 def verify_log(cartridge_path: str, log: bytes,riv_args: str = None,in_card: bytes = None, entropy: str = None,
                frame: int =None,get_outhist=False,get_screenshot=False) -> dict[str,bytes]:
@@ -75,6 +78,21 @@ def handle_advance(data):
         logger.info("Adding notice")
         notice = {"payload": "0x"+outcard.hex()}
         response = requests.post(rollup_server + "/notice", json=notice)
+        try: 
+            response = requests.get(lambada_server + "/open_state")
+            response.raise_for_status() 
+        except requests.exceptions.HTTPError as errh: 
+            return "Failed to open state: {errh}"
+
+        print("State opened successfully.")
+        try: 
+            response = requests.get(lambada_server + "/commit_state")
+            response.raise_for_status() 
+        except requests.exceptions.HTTPError as errh: 
+            return "Failed to commit state: {errh}"
+
+        print("State committed successfully.")
+                
         return "accept"
     except:
         return "reject"
