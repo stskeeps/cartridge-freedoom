@@ -39,13 +39,15 @@ def verify_log(cartridge_path: str, log: bytes,riv_args: str = None,in_card: byt
     run_args.extend(["--setenv", "RIV_OUTCARD", outcard_path])
     if get_screenshot:
         run_args.extend(["--setenv", "RIV_SAVE_SCREENSHOT", screenshot_path])
+    else:
+        run_args.extend(["--setenv", "RIV_NO_YIELD", "y"])
+        
     if in_card is not None and len(in_card) > 0:
         run_args.extend(["--setenv", "RIV_INCARD", incard_path])
     if frame is not None:
         run_args.extend(["--setenv", "RIV_STOP_FRAME", f"{frame}"])
     if entropy is not None:
         run_args.extend(["--setenv", "RIV_ENTROPY", f"{entropy}"])
-    run_args.extend(["--setenv", "RIV_NO_YIELD", "y"])
     run_args.append("riv-run")
     if riv_args is not None and len(riv_args) > 0:
         run_args.extend(riv_args.split())
@@ -61,6 +63,7 @@ def verify_log(cartridge_path: str, log: bytes,riv_args: str = None,in_card: byt
     screenshot = b''
     if os.path.exists(screenshot_path):
         with open(screenshot_path,'rb') as f: screenshot = f.read()
+        print(f"screenshot was read, length {len(screenshot)}")
         os.remove(screenshot_path)
 
     os.remove(log_path)
@@ -76,6 +79,8 @@ def handle_advance(data):
         print("== Outcard ==")
         print(outcard.decode('ascii'))
         print("State opened successfully.")
+        screenshot = res["screenshot"]
+        print(f"Length of screenshot: {len(screenshot)}")
         try: 
             response = requests.get(lambada_server + "/open_state")
             response.raise_for_status() 
@@ -91,7 +96,8 @@ def handle_advance(data):
         try: 
             response = requests.post(lambada_server + "/set_state/screenshot.png", data = res["screenshot"], headers={'Content-Type': 'application/octet-stream'})
             response.raise_for_status() 
-        except requests.exceptions.HTTPError as errh: 
+        except requests.exceptions.HTTPError as errh:
+            print("Something went wrong storing the screenshot")
             return "reject"
 
         print("State set successfully.")
