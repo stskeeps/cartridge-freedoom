@@ -2,7 +2,9 @@ from os import environ
 import os
 import subprocess
 import logging
+import struct
 import requests
+import json
 
 logging.basicConfig(level="INFO")
 logger = logging.getLogger(__name__)
@@ -78,7 +80,7 @@ def handle_advance(data):
         outcard = res["outcard"]
         print("== Outcard ==")
         print(outcard.decode('ascii'))
-        print("State opened successfully.")
+        outcard = outcard[4:]
         screenshot = res["screenshot"]
         print(f"Length of screenshot: {len(screenshot)}")
         try: 
@@ -87,11 +89,23 @@ def handle_advance(data):
         except requests.exceptions.HTTPError as errh: 
             return "reject"
 
+        print("State opened successfully.")
+        decoded_json = json.loads(outcard)
+        score = decoded_json['score']
+        score_bytes = struct.pack('>Q', score)
+        
         try: 
-            response = requests.post(lambada_server + "/set_state/outcard", data = outcard, headers={'Content-Type': 'application/octet-stream'})
+            response = requests.post(lambada_server + "/set_state/result.json", data = outcard, headers={'Content-Type': 'application/octet-stream'})
             response.raise_for_status() 
         except requests.exceptions.HTTPError as errh: 
             return "reject"
+
+        try: 
+            response = requests.post(lambada_server + "/set_state/output", data = score_bytes, headers={'Content-Type': 'application/octet-stream'})
+            response.raise_for_status() 
+        except requests.exceptions.HTTPError as errh: 
+            return "reject"
+
 
         try: 
             response = requests.post(lambada_server + "/set_state/screenshot.png", data = res["screenshot"], headers={'Content-Type': 'application/octet-stream'})
