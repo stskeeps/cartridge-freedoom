@@ -7,7 +7,6 @@ import struct
 import requests
 import sha3
 import json
-import mmap
 
 logging.basicConfig(level="INFO")
 logger = logging.getLogger(__name__)
@@ -73,9 +72,9 @@ def verify_log(cartridge_path: str, log: bytes,riv_args: str = None,in_card: byt
     return {"screenshot":screenshot, "outcard":outcard_raw}
 
 def emit_notice(data):
-    notice_payload = {"payload": data.hex()}
+    notice_payload = {"payload": "0x" + data.hex()}
     response = requests.post(rollup_server + "/notice", json=notice_payload)
-    if response.status_code == 200:
+    if response.status_code == 201:
         logger.info(f"Notice emitted successfully with data: {data}")
     else:
         logger.error(f"Failed to emit notice with data: {data}. Status code: {response.status_code}")
@@ -88,19 +87,19 @@ def emit_report(data):
     else:
         logger.error(f"Failed to emit report with data: {data}. Status code: {response.status_code}")
 
-def put_image_keccack256(data):
+def put_image_keccak256(data):
     k = sha3.keccak_256()
     k.update(data)
     
-    gio_payload = {"domain": 0x2c, "id": data.hex()}
-    response = requests.post(rollup_server + "/gio", json=gio)
-    if response.status_code == 200:
+    gio_payload = {"domain": 0x2c, "id": "0x" + data.hex()}
+    response = requests.post(rollup_server + "/gio", json=gio_payload)
+    if response.status_code == 202:
         logger.info(f"PutImageKeccak256 emitted successfully with data: {data}")
     else:
         logger.error(f"Failed to PutImageKeccak256 with data: {data}. Status code: {response.status_code}")
     return k.digest()
 
-def handle_advance(data, lambda_mapping):
+def handle_advance(data):
     logger.info(f"Received advance request data {data}")
     try:
         log = bytearray.fromhex(data["payload"][2:])
@@ -115,6 +114,9 @@ def handle_advance(data, lambda_mapping):
         score = decoded_json['score']
         screenshot_hash = put_image_keccak256(screenshot)
         outcard_hash = put_image_keccak256(outcard)
+        
+        logger.info(f"screenshot hash: {screenshot_hash.hex()}")
+        logger.info(f"outcard hash: {outcard_hash.hex()}")
         
         score_bytes = struct.pack('>Q', score)
         notice = score_bytes + screenshot_hash + outcard_hash
@@ -149,4 +151,4 @@ while True:
         rollup_request = response.json()
         data = rollup_request["data"]
         handler = handlers[rollup_request["request_type"]]
-        finish["status"] = handler(rollup_request["data"], mm)
+        finish["status"] = handler(rollup_request["data"])
